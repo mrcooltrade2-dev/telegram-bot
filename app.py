@@ -1,7 +1,7 @@
 from flask import Flask, request
 import requests
 
-app = Flask(name)
+app = Flask(__name__)
 
 TOKEN = "8498415880:AAG5Yn6jhXRL85VpNCBkSL1-Y9nS7fL1w98" 
 URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -23,5 +23,5 @@ def bot():
 def home():
     return "Bot is running!"
 
-if name == "main":
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80)
