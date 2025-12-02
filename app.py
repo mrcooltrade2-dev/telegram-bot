@@ -134,8 +134,9 @@ def auto_scan():
 # -----------------------------
 @app.route("/", methods=["GET"])
 def home():
-    return "Bot running!"  
-   @app.route("/webhook/<token>", methods=["POST"])
+    return "Bot running!"
+
+@app.route("/webhook/<token>", methods=["POST"])
 def webhook(token):
     data = request.get_json()
     chat_id = data["message"]["chat"]["id"]
