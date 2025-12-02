@@ -5,26 +5,49 @@ import time
 
 app = Flask(__name__)
 
+# -----------------------------
+# توکن تلگرام و سرمایه کاربر
+# -----------------------------
 TOKEN = "8498415880:AAG5Yn6jhXRL85VpNCBkSL1-Y9nS7fL1w98"
 SEND_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+USER_CAPITAL = 5  # دلاری که میخوای براش محاسبه بشه
 
-DEX_API = "https://api.dexscreener.com/latest/dex/tokens/"
-SCAN_INTERVAL = 30*60  # 30 دقیقه
-MIN_DIFF = 30
-INVEST_AMOUNT = 5
+# -----------------------------
+# پارامترهای اسکن
+# -----------------------------
 DEX_LIST = ["PancakeSwap", "ApeSwap", "BabyDogeSwap", "Biswap", "MDEX", "Nomiswap"]
+MIN_DIFF = 30
 MIN_LIQUIDITY = 20000
 MAX_TAX = 10
+SCAN_INTERVAL = 30*60  # 30 دقیقه
 
-# تاریخچه فرصت‌ها
 history = []
 
+# -----------------------------
+# ارسال پیام تلگرام
+# -----------------------------
 def send_telegram(text):
     requests.post(SEND_URL, json={"chat_id": TOKEN.split(":")[0], "text": text})
 
+# -----------------------------
+# گرفتن لیست توکن‌ها از Dexscreener API
+# -----------------------------
+def get_bsc_tokens():
+    try:
+        url = "https://api.dexscreener.com/latest/dex/tokens/bsc"  # نمونه API
+        r = requests.get(url).json()
+        tokens = [t['address'] for t in r.get('pairs', [])]
+        return list(set(tokens))  # حذف تکراری
+    except:
+        return []
+
+# -----------------------------
+# اسکن یک توکن
+# -----------------------------
 def scan_token(contract):
     try:
-        r = requests.get(DEX_API + contract).json()
+        url = f"https://api.dexscreener.com/latest/dex/tokens/{contract}"
+        r = requests.get(url).json()
         pairs = r.get("pairs", [])
         valid_pairs = []
 
@@ -51,7 +74,9 @@ def scan_token(contract):
         if diff < MIN_DIFF:
             return None
 
-        profit = INVEST_AMOUNT * diff / 100
+        profit = USER_CAPITAL * diff / 100
+        max_trades = int(USER_CAPITAL / buy["price"]) if buy["price"] > 0 else 0
+
         return {
             "contract": contract,
             "diff": diff,
@@ -59,15 +84,19 @@ def scan_token(contract):
             "buy_dex": buy["dex"],
             "sell_dex": sell["dex"],
             "liq": {p["dex"]: p["liq"] for p in valid_pairs},
-            "tax": {"buy": buy["buy_tax"], "sell": sell["sell_tax"]}
+            "tax": {"buy": buy["buy_tax"], "sell": sell["sell_tax"]},
+            "max_trades": max_trades
         }
 
     except:
         return None
 
+# -----------------------------
+# اسکن دوره‌ای کل بازار
+# -----------------------------
 def auto_scan():
     while True:
-        contracts = ["0x8f92dF3A9b1C217Ff4A67b0F0d91c135711bdE3e"]
+        contracts = get_bsc_tokens()
         for c in contracts:
             res = scan_token(c)
             if res:
@@ -79,7 +108,7 @@ def auto_scan():
 
 💰 اختلاف قیمت: {res['diff']:.2f}%
 
-💵 سود خالص روی {INVEST_AMOUNT}$:
+💵 سود خالص روی {USER_CAPITAL}$:
 👉 {res['profit']:.4f} $
 
 🛒 خرید از: {res['buy_dex']}
@@ -91,17 +120,22 @@ def auto_scan():
                     msg += f"{dex}: {liq}$\n"
 
                 msg += f"\n🧾 Taxes:\nBuy: {res['tax']['buy']}%\nSell: {res['tax']['sell']}%"
+                msg += f"\n💹 تعداد دفعات قابل معامله: {res['max_trades']}"
+
                 send_telegram(msg)
+
                 history.insert(0, msg)
                 if len(history) > 10:
                     history.pop()
         time.sleep(SCAN_INTERVAL)
 
+# -----------------------------
+# وبهوک تلگرام
+# -----------------------------
 @app.route("/", methods=["GET"])
 def home():
-    return "Bot running!"
-
-@app.route("/webhook/<token>", methods=["POST"])
+    return "Bot running!"  
+    @app.route("/webhook/<token>", methods=["POST"])
 def webhook(token):
     data = request.get_json()
     chat_id = data["message"]["chat"]["id"]
@@ -110,6 +144,9 @@ def webhook(token):
     requests.post(send_url, json={"chat_id": chat_id, "text": f"پیامت رسید: {text}"})
     return "ok"
 
+# -----------------------------
+# داشبورد وب ساده
+# -----------------------------
 @app.route("/dashboard")
 def dashboard():
     html = """
@@ -129,6 +166,9 @@ def dashboard():
 """
     return render_template_string(html, history=history)
 
+# -----------------------------
+# اجرا
+# -----------------------------
 if __name__ == "__main__":
     threading.Thread(target=auto_scan).start()
     app.run(host="0.0.0.0", port=80)
