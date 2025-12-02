@@ -3,10 +3,10 @@ import requests
 
 app = Flask(__name__)
 
-TOKEN = "8498415880:AAG5Yn6jhXRL85VpNCBkSL1-Y9nS7fL1w98" 
+TOKEN = "8498415880:AAG5Yn6jhXRL85VpNCBkSL1-Y9nS7fL1w98"
 URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
-@app.route("/", methods=["POST"])
+@app.route("/webhook/" + TOKEN, methods=["POST"])
 def bot():
     data = request.get_json()
     chat_id = data["message"]["chat"]["id"]
